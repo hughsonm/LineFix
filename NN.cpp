@@ -363,7 +363,7 @@ int main(int argc, char**argv)
 
     Net brain;
     brain.add_layer(n_entries);
-    brain.add_layer(8);
+    brain.add_layer(n_entries/10);
     brain.add_layer(n_entries);
 
     std::vector<double> input_vector(n_entries);
@@ -402,12 +402,12 @@ int main(int argc, char**argv)
                     std::cerr << index2word[sample[ii]] << " ";
                 }
                 std::cerr << std::endl;
+                for(auto & right_idx : sample){
+                    desired_output_vector[right_idx] = 1;
+                }
                 for(auto& left_idx : sample){
                     input_vector[left_idx] = 1;
                     double step_for_pair = step_size/word2freq[index2word[left_idx]]/word_count;
-                    for(auto & right_idx : sample){
-                        desired_output_vector[right_idx] = 1;
-                    }
                     brain.predict(
                         input_vector,
                         result_vector
@@ -416,11 +416,11 @@ int main(int argc, char**argv)
                         input_vector,
                         desired_output_vector
                     );
-                    for(auto & right_idx : sample){
-                        desired_output_vector[right_idx] = 0;
-                    }
                     brain.update_weights(step_for_pair);
                     input_vector[left_idx] = 0;
+                }
+                for(auto & right_idx : sample){
+                    desired_output_vector[right_idx] = 0;
                 }
             }
         }else if(request == "c"){
@@ -441,19 +441,19 @@ int main(int argc, char**argv)
                     input_vector,
                     result_vector
                 );
-                auto result_index{
-                    std::distance(
-                        result_vector.begin(),
-                        std::max_element(
-                            result_vector.begin(),
-                            result_vector.end()
-                        )
-                    )
-                };
-                auto result_confidence = result_vector[result_index];
-                std::string result_word{index2word[result_index]};
-                std::cerr << "Request: <" << in_word << "> maps to result <" << result_word << "> with " << 100.0*result_confidence << " confidence." << std::endl;
-
+                std::vector<int> idcs_to_sort(result_vector.size());
+                for(auto ii{0};ii<idcs_to_sort.size();++ii){
+                    idcs_to_sort[ii] = ii;
+                }
+                std::cerr << "Word count = " << word_count;
+                std::sort(
+                    idcs_to_sort.begin(),idcs_to_sort.end(),[&result_vector](int x,int y){
+                        return(result_vector[x]>result_vector[y]);
+                    }
+                );
+                for(auto ii{0};ii<10;++ii){
+                    std::cerr << "Request <" << in_word << "> maps to result <" << index2word[idcs_to_sort[ii]] << "> with " << 100.0*result_vector[idcs_to_sort[ii]] << " confidence." << std::endl;
+                }               
             }else{
                 std::cerr << "Request: <" << request << "> does not appear in dictionary" << std::endl;
             }
