@@ -329,8 +329,6 @@ Layer * Net::add_layer(
 
 int main(int argc, char**argv)
 {
-
-
     std::ifstream reader("CleanedShort.txt");
     std::string word;
     std::map<std::string,int> word2index;
@@ -453,7 +451,7 @@ int main(int argc, char**argv)
                 );
                 for(auto ii{0};ii<10;++ii){
                     std::cerr << "Request <" << in_word << "> maps to result <" << index2word[idcs_to_sort[ii]] << "> with " << 100.0*result_vector[idcs_to_sort[ii]] << " confidence." << std::endl;
-                }               
+                }
             }else{
                 std::cerr << "Request: <" << request << "> does not appear in dictionary" << std::endl;
             }
