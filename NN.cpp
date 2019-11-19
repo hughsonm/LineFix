@@ -28,10 +28,10 @@ public:
     void show(int depth);
 };
 void Synapse::show(int depth){
-    // std::cerr << "src:    " << source << std::endl;
-    // std::cerr << "dest:   " << destination << std::endl;
-    for(int ii{0}; ii<depth; ++ii) std::cerr << "\t";
-    std::cerr << "weight: " << weight << std::endl;
+    // std::cout << "src:    " << source << "\n";
+    // std::cout << "dest:   " << destination << "\n";
+    for(int ii{0}; ii<depth; ++ii) std::cout << "\t";
+    std::cout << "weight: " << weight << "\n";
 }
 
 class Neuron{
@@ -70,9 +70,9 @@ public:
 void Neuron::show(int depth){
     std::string indent{""};
     for(int ii{0}; ii<depth; ++ii) indent += "\t";
-    std::cerr << indent << "This neuron has " << inputs.size() << " inputs." << std::endl;
-    std::cerr << indent << "My offset is " << b << std::endl;
-    std::cerr << indent << "My current g is " << g << std::endl;
+    std::cout << indent << "This neuron has " << inputs.size() << " inputs." << "\n";
+    std::cout << indent << "My offset is " << b << "\n";
+    std::cout << indent << "My current g is " << g << "\n";
     for(auto ii{0}; ii<inputs.size();++ii){
         inputs[ii]->show(depth+1);
     }
@@ -136,11 +136,11 @@ void Layer::propagate_derivative(void){
 void Layer::show(int depth){
     std::string indent{""};
     for(int ii{0}; ii<depth; ++ii) indent += "\t";
-    std::cerr << indent << "This layer has " << neurons.size() << " neurons." << std::endl;
+    std::cout << indent << "This layer has " << neurons.size() << " neurons." << "\n";
 
     for(auto ii{0}; ii<neurons.size(); ++ii)
     {
-        std::cerr << indent << "Neuron Number: " << ii << std::endl;
+        std::cout << indent << "Neuron Number: " << ii << "\n";
         neurons[ii]->show(depth+1);
     }
 }
@@ -252,28 +252,28 @@ void Net::back_prop(
 
 
 void Net::show(void){
-    std::cerr << "This neural net has " << layers.size() << " layers." << std::endl;
+    std::cout << "This neural net has " << layers.size() << " layers." << "\n";
     int neuron_depth = 1;
     if(layers.size()){
-        std::cerr << "Let us show all the layers" << std::endl;
+        std::cout << "Let us show all the layers" << "\n";
         Layer * current_layer{layers[0]};
         bool keep_printing{true};
         bool found_a_neuron{false};
         while(keep_printing){
-            // std::cerr << "\tThis layer has " << current_layer->neurons.size() << " neurons" << std::endl;
+            // std::cout << "\tThis layer has " << current_layer->neurons.size() << " neurons" << "\n";
             if(neuron_depth <= current_layer->neurons.size()){
-                std::cerr << "*\t";
+                std::cout << "*\t";
                 found_a_neuron = true;
             } else{
-                std::cerr <<"\t";
+                std::cout <<"\t";
             }
             if(current_layer->next){
-                // std::cerr << "Moving to next layer" << std::endl;
+                // std::cout << "Moving to next layer" << "\n";
                 current_layer = current_layer->next;
             } else{
-                // std::cerr << "Moving back to the start..." << std::endl;
+                // std::cout << "Moving back to the start..." << "\n";
                 current_layer = layers[0];
-                std::cerr << std::endl;
+                std::cout << "\n";
                 keep_printing = found_a_neuron;
                 found_a_neuron = false;
                 neuron_depth++;
@@ -282,7 +282,7 @@ void Net::show(void){
     }
     for(auto ii{0};ii<layers.size();++ii)
     {
-        std::cerr << "Layer Number: " << ii << std::endl;
+        std::cout << "Layer Number: " << ii << "\n";
         layers[ii]->show(1);
     }
 }
@@ -327,157 +327,245 @@ Layer * Net::add_layer(
     return(ll);
 }
 
+class Game{
+public:
+    std::string home_team{""},away_team{""};
+    int home_score{0},away_score{0};
+    int home_rest{0},away_rest{0};
+};
+
 int main(int argc, char**argv)
 {
-    std::ifstream reader("CleanedShort.txt");
+    std::ifstream reader("Games.txt");
     std::string word;
-    std::map<std::string,int> word2index;
-    std::map<std::string,double> word2freq;
-    std::vector<std::string> index2word;
-    std::vector<int> story;
-    int current_index{0};
-    int word_count{0};
+    std::map<std::string,int> team2index;
+    std::vector<std::string> index2team;
+    std::vector<Game> games_train;
+    std::string site;
+    int team_name_index{0};
     while(!reader.eof()){
-        reader >> word;
-        word_count++;
-        if(!word2index.count(word)){
-            word2index[word] = current_index++;
-            word2freq[word] = 1.0;
-            index2word.push_back(word);
+        // Get info for this game
+        Game game_from_line;
+        reader >> site;
+        if(reader.eof()) break;
+        if(site=="home"){
+            reader >> game_from_line.home_team;
+            reader >> game_from_line.home_score;
+            reader >> game_from_line.home_rest;
+            reader >> game_from_line.away_team;
+            reader >> game_from_line.away_score;
+            reader >> game_from_line.away_rest;
+        } else{
+            reader >> game_from_line.away_team;
+            reader >> game_from_line.away_score;
+            reader >> game_from_line.away_rest;
+            reader >> game_from_line.home_team;
+            reader >> game_from_line.home_score;
+            reader >> game_from_line.home_rest;
         }
-        word2freq[word] += 1.0;
-        story.push_back(word2index[word]);
-        // std::cerr << word << std::endl;
+        if(!team2index.count(game_from_line.home_team)){
+            std::cout << "Index:\t" << team_name_index << "\tTeam:\t";
+            std::cout << game_from_line.home_team << "\n";
+            team2index[game_from_line.home_team] = team_name_index++;
+            index2team.push_back(game_from_line.home_team);
+        }
+        if(!team2index.count(game_from_line.away_team)){
+            std::cout << "Index:\t" << team_name_index << "\tTeam:\t";
+            std::cout << game_from_line.away_team << "\n";
+            team2index[game_from_line.away_team] = team_name_index++;
+            index2team.push_back(game_from_line.away_team);
+        }
+        games_train.push_back(game_from_line);
+        // std::cout << word << "\n";
     }
-    int word_index{0};
-    for(auto& word : index2word){
-        word2freq[word] /= word_count;
-        std::cerr << word_index++ << "\t" << word << "\t" << word2freq[word] << std::endl;
+
+    std::vector<Game> games_test;
+    auto split_index{games_train.size()*3/4};
+    for(auto ii{split_index};ii<games_train.size();++ii){
+        games_test.push_back(games_train[ii]);
     }
-    std::cerr << "Saw " << word_count << " words, and made " << current_index << " map entries " << std::endl;
+    games_train.resize(split_index);
+
     reader.close();
 
-    int n_entries{current_index};
+    int n_teams{team_name_index};
 
     Net brain;
-    brain.add_layer(n_entries);
-    brain.add_layer(n_entries/10);
-    brain.add_layer(n_entries);
+    brain.add_layer(2*n_teams+2);
+    brain.add_layer(n_teams*n_teams);
+    brain.add_layer(2);
 
-    std::vector<double> input_vector(n_entries);
-    std::vector<double> desired_output_vector(n_entries);
-    std::vector<double> result_vector(n_entries);
+    std::vector<double> input_vector(2*n_teams+2);
+    std::vector<double> desired_output_vector(2);
+    std::vector<double> result_vector(2);
 
 
     bool keep_interacting{true};
+    bool show_output{true};
 
     while(keep_interacting){
-        std::cout << "Train(t), Cull(c), Map(m), Vector(v), Show(s), Quit(q)" << std::endl;
+        std::cout << "Train(t), Cull(c), Map(m), Show(s), Verify(v), Show/Hide Output(h), Quit(q)" << "\n";
         std::string request;
         std::cin >> request;
         if(request=="t"){
-            std::cerr << "How big shoudl the step size be?" << std::endl;
+            std::cout << "How big shoudl the step size be?" << "\n";
             double step_size;
             std::cin >> step_size;
-            std::cerr << "How many samples shall we run?" << std::endl;
+            std::cout << "How many samples shall we run?" << "\n";
             int n_samples;
             std::cin >> n_samples;
-            std::cerr << "How many words per sample?" << std::endl;
-            int sample_size;
-            std::cin >> sample_size;
-            std::cerr << "Trianing with step size = " << step_size << std::endl;
-            std::cerr << "**********" << std::endl;
-            std::fill(input_vector.begin(),input_vector.end(),0.0);
-            std::fill(desired_output_vector.begin(),desired_output_vector.end(),0.0);
-            std::vector<int> sample(2*sample_size+1);
+            std::fill(
+                input_vector.begin(),
+                input_vector.end(),
+                0.0
+            );
+            std::fill(
+                desired_output_vector.begin(),
+                desired_output_vector.end(),
+                0.0
+            );
             for(auto isample{0}; isample<n_samples; ++isample){
-                auto choose_mid{
-                    sample_size + (std::rand() % (story.size()-2*sample_size))
-                };
-                std::cerr << "Sample number " << isample << ": ";
-                for(auto ii{0}; ii<(2*sample_size+1);++ii){
-                    sample[ii] = story[choose_mid-sample_size+ii];
-                    std::cerr << index2word[sample[ii]] << " ";
+
+                const auto sample_index{std::rand()%games_train.size()};
+                auto& sample_game{games_train[sample_index]};
+                bool home_win{sample_game.away_score<sample_game.home_score};
+                if(home_win){
+                    desired_output_vector[0] = 1;
+                } else{
+                    desired_output_vector[1] = 1;
                 }
-                std::cerr << std::endl;
-                for(auto & right_idx : sample){
-                    desired_output_vector[right_idx] = 1;
+                input_vector[team2index[sample_game.home_team]] = 1;
+                input_vector[n_teams+team2index[sample_game.away_team]] = 1;
+                input_vector[2*n_teams+0]=sample_game.home_rest;
+                input_vector[2*n_teams+1]=sample_game.away_rest;
+                // std::cout << "<";
+                // for(auto& vi : input_vector){
+                //     std::cout << vi << ",";
+                // }
+                // std::cout << ":\n";
+
+
+                brain.predict(
+                    input_vector,
+                    result_vector
+                );
+                bool predict_home_win{result_vector[1] < result_vector[0]};
+                if(show_output){
+                    std::cout << sample_game.home_team << " vs " << sample_game.away_team << ": " << sample_game.home_score << "-" << sample_game.away_score << "\n";
+                    if(predict_home_win){
+                        if(home_win){
+                            std::cout << "Correctly predicted home win";
+                        } else{
+                            std::cout << "Predicted home win. Observed home loss";
+                        }
+                    } else
+                    {
+                        if(home_win){
+                            std::cout << "Predicted home loss. Observed home win";
+                        } else{
+                            std::cout << "Correctly predicted home loss";
+                        }
+                    }
+                    std::cout << "\n";
                 }
-                for(auto& left_idx : sample){
-                    input_vector[left_idx] = 1;
-                    double step_for_pair = step_size/word2freq[index2word[left_idx]]/word_count;
-                    brain.predict(
-                        input_vector,
-                        result_vector
-                    );
-                    brain.back_prop(
-                        input_vector,
-                        desired_output_vector
-                    );
-                    brain.update_weights(step_for_pair);
-                    input_vector[left_idx] = 0;
-                }
-                for(auto & right_idx : sample){
-                    desired_output_vector[right_idx] = 0;
-                }
+                brain.back_prop(
+                    input_vector,
+                    desired_output_vector
+                );
+                brain.update_weights(step_size);
+                std::fill(
+                    input_vector.begin(),
+                    input_vector.end(),
+                    0.0
+                );
+                std::fill(
+                    desired_output_vector.begin(),
+                    desired_output_vector.end(),
+                    0.0
+                );
             }
+            std::cout << "\n";
         }else if(request == "c"){
             double thresh;
-            std::cerr << "Cull to what threshold?" << std::endl;
+            std::cout << "Cull to what threshold?" << "\n";
             std::cin >> thresh;
-            std::cerr << "Culling with threshold = " << thresh << std::endl;
-            std::cerr << "Removed " << brain.cull(thresh) << " synapses." << std::endl;
+            std::cout << "Culling with threshold = " << thresh << "\n";
+            std::cout << "Removed " << brain.cull(thresh) << " synapses." << "\n";
 
         }else if(request == "m"){
-            std::cerr << "Which word would you like to investigate?" << std::endl;
-            std::string in_word;
-            std::cin >> in_word;
-            if(word2index.count(in_word)){
-                int in_word_index{word2index[in_word]};
-                input_vector[in_word_index] = 1;
+            std::cout << "Which home team would you like to investigate? (Use integer index)" << "\n";
+            int home_index;
+            std::cin >> home_index;
+            std::cout << "Which away team would you like to investigate? (Use integer index)" << "\n";
+            int away_index;
+            std::cin >> away_index;
+            std::cout << "Amount of home team rest?" << "\n";
+            int home_rest;
+            std::cin >> home_rest;
+            std::cout << "Amount of away team rest?" << "\n";
+            int away_rest;
+            std::cin >> away_rest;
+            if(
+                (0<=home_index) &&
+                (home_index<n_teams) &&
+                (0<=away_index) &&
+                (away_index<n_teams) &&
+                (0<=home_rest) &&
+                (0<=away_rest)
+            ){
+                input_vector[home_index] = 1;
+                input_vector[n_teams+away_index] = 1;
+                input_vector[2*n_teams+0] = home_rest;
+                input_vector[2*n_teams+1] = away_rest;
                 brain.predict(
                     input_vector,
                     result_vector
                 );
-                std::vector<int> idcs_to_sort(result_vector.size());
-                for(auto ii{0};ii<idcs_to_sort.size();++ii){
-                    idcs_to_sort[ii] = ii;
-                }
-                std::cerr << "Word count = " << word_count;
-                std::sort(
-                    idcs_to_sort.begin(),idcs_to_sort.end(),[&result_vector](int x,int y){
-                        return(result_vector[x]>result_vector[y]);
-                    }
-                );
-                for(auto ii{0};ii<10;++ii){
-                    std::cerr << "Request <" << in_word << "> maps to result <" << index2word[idcs_to_sort[ii]] << "> with " << 100.0*result_vector[idcs_to_sort[ii]] << " confidence." << std::endl;
-                }
+                std::cout << "Home win chance: (" << index2team[home_index] <<")" << result_vector[0] << ":\n";
+                std::cout << "Away win chance: (" << index2team[away_index] <<")" << result_vector[1] << ":\n";
+                std::fill(input_vector.begin(),input_vector.end(),0.0);
             }else{
-                std::cerr << "Request: <" << request << "> does not appear in dictionary" << std::endl;
-            }
-        }else if(request == "v"){
-            std::cerr << "Which word would you like to investigate?" << std::endl;
-            std::string v_word;
-            std::cin >> v_word;
-            if(word2index.count(v_word)){
-                int v_word_index{word2index[v_word]};
-                input_vector[v_word_index] = 1;
-                brain.predict(
-                    input_vector,
-                    result_vector
-                );
-                std::cerr << "<";
-                for(auto& neuron : brain.layers[1]->neurons){
-                    std::cerr << neuron->g << ",";
-                }
-                std::cerr << ">" << std::endl;;
-            }else{
-                std::cerr << "Request: <" << v_word << "> does not appear in dictionary" << std::endl;
+                std::cout << "Invalid team indices\n";
             }
         }else if(request == "s"){
             brain.show();
         }else if(request == "q"){
             keep_interacting = false;
+        }else if(request == "v"){
+            std::fill(input_vector.begin(),input_vector.end(),0.0);
+            std::fill(result_vector.begin(),result_vector.end(),0.0);
+            auto total_n_test{0},total_n_correct{0};
+            for(auto& game : games_test){
+
+                input_vector[team2index[game.home_team]] = 1;
+                input_vector[n_teams+team2index[game.away_team]] = 1;
+
+                brain.predict(
+                    input_vector,
+                    result_vector
+                );
+                if(show_output){
+                    std::cout << game.home_team << " vs " << game.away_team << ": " << game.home_score << "-" << game.away_score << "\n";
+                    std::cout << "Home win chance: (" << game.home_team <<")" << result_vector[0] << ":\n";
+                    std::cout << "Away win chance: (" << game.away_team <<")" << result_vector[1] << ":\n";
+                    std::cout << "\n";
+                }
+                if(game.away_score<game.home_score){
+                    if(result_vector[1] < result_vector[0]){
+                        total_n_correct++;
+                    }
+                }else if(result_vector[0] < result_vector[1]){
+                    total_n_correct++;
+                }
+
+                input_vector[team2index[game.home_team]] = 0;
+                input_vector[n_teams+team2index[game.away_team]] = 0;
+                total_n_test++;
+            }
+            std::cout << total_n_test << " total tests" << "\n";
+            std::cout << total_n_correct << " correct" << "\n";
+        } else if(request == "h"){
+            show_output = !show_output;
         }
     }
 
