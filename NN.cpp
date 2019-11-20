@@ -332,6 +332,25 @@ public:
     std::string home_team{""},away_team{""};
     int home_score{0},away_score{0};
     int home_rest{0},away_rest{0};
+    double exp_home_win_margin{0};
+    double act_home_win_margin{0};
+    bool home_covered_spread;
+    void fill_input_vector(
+        std::vector<double>&in_vec,
+        int n_teams,
+        const std::map<std::string,int>& t2i
+    ){
+        std::fill(
+            in_vec.begin(),
+            in_vec.end(),
+            0.0
+        );
+        in_vec[t2i.at(home_team)]=1;
+        in_vec[n_teams+t2i.at(away_team)]=1;
+        in_vec[2*n_teams+0] = home_rest;
+        in_vec[2*n_teams+1] = away_rest;
+        in_vec[2*n_teams+2] = exp_home_win_margin;
+    }
 };
 
 int main(int argc, char**argv)
@@ -340,7 +359,7 @@ int main(int argc, char**argv)
     std::string word;
     std::map<std::string,int> team2index;
     std::vector<std::string> index2team;
-    std::vector<Game> games_train;
+    std::vector<Game> all_games;
     std::string site;
     int team_name_index{0};
     while(!reader.eof()){
@@ -349,20 +368,22 @@ int main(int argc, char**argv)
         reader >> site;
         if(reader.eof()) break;
         if(site=="home"){
+            // Each game appears in the database twice: once as home and once as away.
+            // Only keep track of the home version
             reader >> game_from_line.home_team;
             reader >> game_from_line.home_score;
             reader >> game_from_line.home_rest;
             reader >> game_from_line.away_team;
             reader >> game_from_line.away_score;
             reader >> game_from_line.away_rest;
-        } else{
-            reader >> game_from_line.away_team;
-            reader >> game_from_line.away_score;
-            reader >> game_from_line.away_rest;
-            reader >> game_from_line.home_team;
-            reader >> game_from_line.home_score;
-            reader >> game_from_line.home_rest;
+            double margin;
+            reader >> margin;
+            game_from_line.exp_home_win_margin = -margin;
+        } else {
+            continue;
         }
+        game_from_line.act_home_win_margin = game_from_line.home_score-game_from_line.away_score;
+        game_from_line.home_covered_spread = (0<game_from_line.act_home_win_margin);
         if(!team2index.count(game_from_line.home_team)){
             std::cout << "Index:\t" << team_name_index << "\tTeam:\t";
             std::cout << game_from_line.home_team << "\n";
@@ -375,27 +396,31 @@ int main(int argc, char**argv)
             team2index[game_from_line.away_team] = team_name_index++;
             index2team.push_back(game_from_line.away_team);
         }
-        games_train.push_back(game_from_line);
-        // std::cout << word << "\n";
+        all_games.push_back(game_from_line);
     }
+    reader.close();
 
     std::vector<Game> games_test;
-    auto split_index{games_train.size()*3/4};
-    for(auto ii{split_index};ii<games_train.size();++ii){
-        games_test.push_back(games_train[ii]);
+    std::vector<Game> games_train;
+    for(auto& game : all_games){
+        if(random_double(0,1)<0.9){
+            games_train.push_back(game);
+        } else{
+            games_test.push_back(game);
+        }
     }
-    games_train.resize(split_index);
 
-    reader.close();
+    std::cout << "Training Set: " << games_train.size() << " games\n";
+    std::cout << "Testing Set:  " << games_test.size() << " games\n";
 
     int n_teams{team_name_index};
 
     Net brain;
-    brain.add_layer(2*n_teams+2);
+    brain.add_layer(2*n_teams+3);
     brain.add_layer(n_teams*n_teams);
     brain.add_layer(2);
 
-    std::vector<double> input_vector(2*n_teams+2);
+    std::vector<double> input_vector(2*n_teams+3);
     std::vector<double> desired_output_vector(2);
     std::vector<double> result_vector(2);
 
@@ -408,17 +433,12 @@ int main(int argc, char**argv)
         std::string request;
         std::cin >> request;
         if(request=="t"){
-            std::cout << "How big shoudl the step size be?" << "\n";
+            std::cout << "How big should the step size be?" << "\n";
             double step_size;
             std::cin >> step_size;
             std::cout << "How many samples shall we run?" << "\n";
             int n_samples;
             std::cin >> n_samples;
-            std::fill(
-                input_vector.begin(),
-                input_vector.end(),
-                0.0
-            );
             std::fill(
                 desired_output_vector.begin(),
                 desired_output_vector.end(),
@@ -428,42 +448,43 @@ int main(int argc, char**argv)
 
                 const auto sample_index{std::rand()%games_train.size()};
                 auto& sample_game{games_train[sample_index]};
-                bool home_win{sample_game.away_score<sample_game.home_score};
-                if(home_win){
+                if(sample_game.home_covered_spread){
                     desired_output_vector[0] = 1;
                 } else{
                     desired_output_vector[1] = 1;
                 }
-                input_vector[team2index[sample_game.home_team]] = 1;
-                input_vector[n_teams+team2index[sample_game.away_team]] = 1;
-                input_vector[2*n_teams+0]=sample_game.home_rest;
-                input_vector[2*n_teams+1]=sample_game.away_rest;
-                // std::cout << "<";
-                // for(auto& vi : input_vector){
-                //     std::cout << vi << ",";
-                // }
-                // std::cout << ":\n";
-
+                sample_game.fill_input_vector(
+                    input_vector,
+                    n_teams,
+                    team2index
+                );
 
                 brain.predict(
                     input_vector,
                     result_vector
                 );
-                bool predict_home_win{result_vector[1] < result_vector[0]};
+                bool predict_home_cov{result_vector[1] < result_vector[0]};
                 if(show_output){
-                    std::cout << sample_game.home_team << " vs " << sample_game.away_team << ": " << sample_game.home_score << "-" << sample_game.away_score << "\n";
-                    if(predict_home_win){
-                        if(home_win){
-                            std::cout << "Correctly predicted home win";
+                    std::cout << "<";
+                    for(auto& vi : input_vector){
+                        std::cout << vi << ",";
+                    }
+                    std::cout << ":\n";
+                    std::cout << sample_game.home_team << " vs " << sample_game.away_team << ": " << sample_game.home_score << "-" << sample_game.away_score << "(" << sample_game.exp_home_win_margin << ")" "\n";
+                    if(predict_home_cov){
+                        std::cout << "+";
+                        if(sample_game.home_covered_spread){
+                            std::cout << "+";
                         } else{
-                            std::cout << "Predicted home win. Observed home loss";
+                            std::cout << "-";
                         }
                     } else
                     {
-                        if(home_win){
-                            std::cout << "Predicted home loss. Observed home win";
+                        std::cout << "-";
+                        if(sample_game.home_covered_spread){
+                            std::cout << "+";
                         } else{
-                            std::cout << "Correctly predicted home loss";
+                            std::cout << "-";
                         }
                     }
                     std::cout << "\n";
@@ -473,11 +494,6 @@ int main(int argc, char**argv)
                     desired_output_vector
                 );
                 brain.update_weights(step_size);
-                std::fill(
-                    input_vector.begin(),
-                    input_vector.end(),
-                    0.0
-                );
                 std::fill(
                     desired_output_vector.begin(),
                     desired_output_vector.end(),
@@ -493,37 +509,46 @@ int main(int argc, char**argv)
             std::cout << "Removed " << brain.cull(thresh) << " synapses." << "\n";
 
         }else if(request == "m"){
+            Game map_game;
             std::cout << "Which home team would you like to investigate? (Use integer index)" << "\n";
             int home_index;
             std::cin >> home_index;
+
             std::cout << "Which away team would you like to investigate? (Use integer index)" << "\n";
             int away_index;
             std::cin >> away_index;
+
             std::cout << "Amount of home team rest?" << "\n";
-            int home_rest;
-            std::cin >> home_rest;
+            std::cin >> map_game.home_rest;
+
             std::cout << "Amount of away team rest?" << "\n";
-            int away_rest;
-            std::cin >> away_rest;
+            std::cin >> map_game.away_rest;
+
+            std::cout << "Expected win margin for home team?" << "\n";
+            std::cin >> map_game.exp_home_win_margin;
+
             if(
                 (0<=home_index) &&
                 (home_index<n_teams) &&
                 (0<=away_index) &&
                 (away_index<n_teams) &&
-                (0<=home_rest) &&
-                (0<=away_rest)
+                (0<=map_game.home_rest) &&
+                (0<=map_game.away_rest)
             ){
-                input_vector[home_index] = 1;
-                input_vector[n_teams+away_index] = 1;
-                input_vector[2*n_teams+0] = home_rest;
-                input_vector[2*n_teams+1] = away_rest;
+                map_game.home_team = index2team[home_index];
+                map_game.away_team = index2team[away_index];
+                map_game.fill_input_vector(
+                    input_vector,
+                    n_teams,
+                    team2index
+                );
+
                 brain.predict(
                     input_vector,
                     result_vector
                 );
-                std::cout << "Home win chance: (" << index2team[home_index] <<")" << result_vector[0] << ":\n";
-                std::cout << "Away win chance: (" << index2team[away_index] <<")" << result_vector[1] << ":\n";
-                std::fill(input_vector.begin(),input_vector.end(),0.0);
+                std::cout << "Home cover chance: (" << index2team[home_index] <<")" << result_vector[0] << ":\n";
+                std::cout << "Away cover chance: (" << index2team[away_index] <<")" << result_vector[1] << ":\n";
             }else{
                 std::cout << "Invalid team indices\n";
             }
@@ -532,13 +557,14 @@ int main(int argc, char**argv)
         }else if(request == "q"){
             keep_interacting = false;
         }else if(request == "v"){
-            std::fill(input_vector.begin(),input_vector.end(),0.0);
             std::fill(result_vector.begin(),result_vector.end(),0.0);
             auto total_n_test{0},total_n_correct{0};
             for(auto& game : games_test){
-
-                input_vector[team2index[game.home_team]] = 1;
-                input_vector[n_teams+team2index[game.away_team]] = 1;
+                game.fill_input_vector(
+                    input_vector,
+                    n_teams,
+                    team2index
+                );
 
                 brain.predict(
                     input_vector,
@@ -558,8 +584,6 @@ int main(int argc, char**argv)
                     total_n_correct++;
                 }
 
-                input_vector[team2index[game.home_team]] = 0;
-                input_vector[n_teams+team2index[game.away_team]] = 0;
                 total_n_test++;
             }
             std::cout << total_n_test << " total tests" << "\n";
