@@ -194,6 +194,18 @@ public:
             delete layer;
         }
     }
+    double get_grad_norm(void){
+        double norm_sq{0};
+        for(auto& layer : layers){
+            for(auto& neuron:layer->neurons){
+                for(auto& syn:neuron->inputs){
+                    norm_sq += (syn->dFdw)*(syn->dFdw);
+                }
+                norm_sq += (neuron->dFdb)*(neuron->dFdb);
+            }
+        }
+        return(std::sqrt(norm_sq));
+    }
 };
 
 int Net::cull(
@@ -463,13 +475,24 @@ int main(int argc, char**argv)
                     input_vector,
                     result_vector
                 );
+                double prediction_error{0};
+                for(auto nn{0}; nn<result_vector.size();++nn){
+                    prediction_error += (result_vector[nn]-desired_output_vector[nn])*(result_vector[nn]-desired_output_vector[nn]);
+                }
                 bool predict_home_cov{result_vector[1] < result_vector[0]};
+
+                brain.back_prop(
+                    input_vector,
+                    desired_output_vector
+                );
+                double grad_norm{brain.get_grad_norm()};
+                brain.update_weights(step_size*prediction_error/grad_norm);
                 if(show_output){
                     std::cout << "<";
                     for(auto& vi : input_vector){
                         std::cout << vi << ",";
                     }
-                    std::cout << ":\n";
+                    std::cout << ">\n";
                     std::cout << sample_game.home_team << " vs " << sample_game.away_team << ": " << sample_game.home_score << "-" << sample_game.away_score << "(" << sample_game.exp_home_win_margin << ")" "\n";
                     if(predict_home_cov){
                         std::cout << "+";
@@ -488,12 +511,12 @@ int main(int argc, char**argv)
                         }
                     }
                     std::cout << "\n";
+                    std::cout << "Prediction error: " << prediction_error << "\n";
+                    std::cout << "Gradient norm   : " << grad_norm << "\n";
+                    std::cout << "Update size     : " << step_size*prediction_error/grad_norm << "\n";
+                    std::cout << "\n";
+
                 }
-                brain.back_prop(
-                    input_vector,
-                    desired_output_vector
-                );
-                brain.update_weights(step_size);
                 std::fill(
                     desired_output_vector.begin(),
                     desired_output_vector.end(),
