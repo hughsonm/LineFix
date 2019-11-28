@@ -388,9 +388,9 @@ int main(int argc, char**argv)
             reader >> game_from_line.away_team;
             reader >> game_from_line.away_score;
             reader >> game_from_line.away_rest;
-            double margin;
-            reader >> margin;
-            game_from_line.exp_home_win_margin = -margin;
+            double line;
+            reader >> line;
+            game_from_line.exp_home_win_margin = -line;
         } else {
             continue;
         }
@@ -580,7 +580,6 @@ int main(int argc, char**argv)
         }else if(request == "q"){
             keep_interacting = false;
         }else if(request == "v"){
-            std::fill(result_vector.begin(),result_vector.end(),0.0);
             auto total_n_test{0},total_n_correct{0};
             for(auto& game : games_test){
                 game.fill_input_vector(
@@ -595,16 +594,20 @@ int main(int argc, char**argv)
                 );
                 if(show_output){
                     std::cout << game.home_team << " vs " << game.away_team << ": " << game.home_score << "-" << game.away_score << "\n";
-                    std::cout << "Home win chance: (" << game.home_team <<")" << result_vector[0] << ":\n";
-                    std::cout << "Away win chance: (" << game.away_team <<")" << result_vector[1] << ":\n";
+                    std::cout << "Home cover chance: (" << game.home_team <<")" << result_vector[0] << ":\n";
+                    std::cout << "Away cover chance: (" << game.away_team <<")" << result_vector[1] << ":\n";
                     std::cout << "\n";
                 }
-                if(game.away_score<game.home_score){
-                    if(result_vector[1] < result_vector[0]){
-                        total_n_correct++;
-                    }
-                }else if(result_vector[0] < result_vector[1]){
-                    total_n_correct++;
+
+                // Who covered the spread?
+
+                auto home_coverage{(game.home_score-game.away_score)-game.exp_home_win_margin};
+                if(0<home_coverage){
+                    bool correct = result_vector[0]>result_vector[1];
+                    if(correct) total_n_correct++;
+                } else{
+                    bool correct = result_vector[0]<result_vector[1];
+                    if(correct) total_n_correct++;
                 }
 
                 total_n_test++;
