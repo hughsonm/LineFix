@@ -331,7 +331,6 @@ Layer * Net::add_layer(
         ll->previous = layers.back();
         layers.back()->next = ll;
     }
-
     for(auto ii{0}; ii<n_neurons; ++ii){
         ll->add_neuron();
     }
@@ -395,7 +394,7 @@ int main(int argc, char**argv)
             continue;
         }
         game_from_line.act_home_win_margin = game_from_line.home_score-game_from_line.away_score;
-        game_from_line.home_covered_spread = (0<game_from_line.act_home_win_margin);
+        game_from_line.home_covered_spread = (game_from_line.exp_home_win_margin<game_from_line.act_home_win_margin);
         if(!team2index.count(game_from_line.home_team)){
             std::cout << "Index:\t" << team_name_index << "\tTeam:\t";
             std::cout << game_from_line.home_team << "\n";
@@ -428,14 +427,14 @@ int main(int argc, char**argv)
     int n_teams{team_name_index};
 
     Net brain;
-    brain.add_layer(2*n_teams+3);
-    brain.add_layer(n_teams*n_teams);
-    brain.add_layer(2);
 
     std::vector<double> input_vector(2*n_teams+3);
-    std::vector<double> desired_output_vector(2);
-    std::vector<double> result_vector(2);
+    std::vector<double> result_vector(1);
+    std::vector<double> desired_output_vector(result_vector.size());
 
+    brain.add_layer(input_vector.size());
+    brain.add_layer(n_teams*n_teams);
+    brain.add_layer(result_vector.size());
 
     bool keep_interacting{true};
     bool show_output{true};
@@ -460,27 +459,22 @@ int main(int argc, char**argv)
 
                 const auto sample_index{std::rand()%games_train.size()};
                 auto& sample_game{games_train[sample_index]};
-                if(sample_game.home_covered_spread){
-                    desired_output_vector[0] = 1;
-                } else{
-                    desired_output_vector[1] = 1;
-                }
+                desired_output_vector[0] = sample_game.home_covered_spread?1.0:0.0;
                 sample_game.fill_input_vector(
                     input_vector,
                     n_teams,
                     team2index
                 );
-
                 brain.predict(
                     input_vector,
                     result_vector
                 );
                 double prediction_error{0};
                 for(auto nn{0}; nn<result_vector.size();++nn){
-                    prediction_error += (result_vector[nn]-desired_output_vector[nn])*(result_vector[nn]-desired_output_vector[nn]);
+                    auto diff{result_vector[nn]-desired_output_vector[nn]};
+                    prediction_error += diff*diff;
                 }
-                bool predict_home_cov{result_vector[1] < result_vector[0]};
-
+                bool predict_home_cov{0.5 < result_vector[0]};
                 brain.back_prop(
                     input_vector,
                     desired_output_vector
@@ -496,19 +490,14 @@ int main(int argc, char**argv)
                     std::cout << sample_game.home_team << " vs " << sample_game.away_team << ": " << sample_game.home_score << "-" << sample_game.away_score << "(" << sample_game.exp_home_win_margin << ")" "\n";
                     if(predict_home_cov){
                         std::cout << "+";
-                        if(sample_game.home_covered_spread){
-                            std::cout << "+";
-                        } else{
-                            std::cout << "-";
-                        }
                     } else
                     {
                         std::cout << "-";
-                        if(sample_game.home_covered_spread){
-                            std::cout << "+";
-                        } else{
-                            std::cout << "-";
-                        }
+                    }
+                    if(sample_game.home_covered_spread){
+                        std::cout << "+";
+                    } else{
+                        std::cout << "-";
                     }
                     std::cout << "\n";
                     std::cout << "Prediction error: " << prediction_error << "\n";
@@ -571,7 +560,6 @@ int main(int argc, char**argv)
                     result_vector
                 );
                 std::cout << "Home cover chance: (" << index2team[home_index] <<")" << result_vector[0] << ":\n";
-                std::cout << "Away cover chance: (" << index2team[away_index] <<")" << result_vector[1] << ":\n";
             }else{
                 std::cout << "Invalid team indices\n";
             }
@@ -580,39 +568,31 @@ int main(int argc, char**argv)
         }else if(request == "q"){
             keep_interacting = false;
         }else if(request == "v"){
-            auto total_n_test{0},total_n_correct{0};
+            auto total_n_correct{0};
             for(auto& game : games_test){
                 game.fill_input_vector(
                     input_vector,
                     n_teams,
                     team2index
                 );
-
                 brain.predict(
                     input_vector,
                     result_vector
                 );
                 if(show_output){
-                    std::cout << game.home_team << " vs " << game.away_team << ": " << game.home_score << "-" << game.away_score << "\n";
-                    std::cout << "Home cover chance: (" << game.home_team <<")" << result_vector[0] << ":\n";
-                    std::cout << "Away cover chance: (" << game.away_team <<")" << result_vector[1] << ":\n";
-                    std::cout << "\n";
+                    std::cout << game.home_team << " vs " << game.away_team;
+                    std::cout << ": " << game.home_score << "-";
+                    std::cout << game.away_score << "(";
+                    std::cout << game.exp_home_win_margin <<")\n";
+                    std::cout << "Home cover chance: (" << game.home_team <<")";
+                    std::cout << result_vector[0] << ":\n";
                 }
-
-                // Who covered the spread?
-
-                auto home_coverage{(game.home_score-game.away_score)-game.exp_home_win_margin};
-                if(0<home_coverage){
-                    bool correct = result_vector[0]>result_vector[1];
-                    if(correct) total_n_correct++;
-                } else{
-                    bool correct = result_vector[0]<result_vector[1];
-                    if(correct) total_n_correct++;
+                bool predict_home_coverage{0.5<result_vector[0]};
+                if(predict_home_coverage == game.home_covered_spread){
+                    total_n_correct++;
                 }
-
-                total_n_test++;
             }
-            std::cout << total_n_test << " total tests" << "\n";
+            std::cout << games_test.size() << " total tests" << "\n";
             std::cout << total_n_correct << " correct" << "\n";
         } else if(request == "h"){
             show_output = !show_output;
