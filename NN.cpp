@@ -559,6 +559,7 @@ int main(int argc, char**argv)
                     input_vector,
                     result_vector
                 );
+		std::cout << index2team[home_index] << " hosting " << index2team[away_index] << ":\n";
                 std::cout << "Home cover chance: (" << index2team[home_index] <<")" << result_vector[0] << ":\n";
             }else{
                 std::cout << "Invalid team indices\n";
